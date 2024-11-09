@@ -50,7 +50,7 @@ node{
 		}
         sh """
             echo "Deploy prod"
-			docker run -d -p 81:81 --name=ivankimura_app_prod ivankimura/unyleya:$BUILD_NUMBER
+			docker run -d -p 81:80 --name=ivankimura_app_prod ivankimura/unyleya:$BUILD_NUMBER
         """
     }
 }
