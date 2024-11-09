@@ -53,5 +53,4 @@ node{
 			docker run -d -p 81:81 --name=ivankimura_app_prod ivankimura/unyleya:$BUILD_NUMBER
         """
     }
-
 }
