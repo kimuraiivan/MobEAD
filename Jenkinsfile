@@ -1,32 +1,57 @@
-pipeline {  
-    environment {
-      registry = "osanamgcj/mobead_image_build"
-      registryCredential = 'dockerhub'
-      dockerImage = ''
+gitUrl = 'https://github.com/kimuraiivan/MobEAD'
+branch = 'main'
+userCred=''
+node{
+	stage ('Git Checkout') {
+		checkout([
+		$class: 'GitSCM',
+		branches: [[name: '*/'+ branch ]],
+		doGenerateSubmoduleConfigurations: false,
+		extensions: [],
+		submoduleCfg: [],
+		userRemoteConfigs: [[credentialsId: userCred, url: gitUrl]]])
+	}
+    stage('SonarQube analysis') {
+        
+		env.NODEJS_HOME = "${tool 'node'}"
+		env.PATH="${env.NODEJS_HOME}/bin:${env.PATH}"
+		sh "node -v"
+		def scannerHome = tool 'sonarqubescanner6.2.1.4610'; 
+        withSonarQubeEnv('sonarQube') { 
+          sh "${scannerHome}/bin/sonar-scanner  \
+          -Dsonar.projectKey=jenkinsproject \
+          -Dsonar.sources=. \
+          -Dsonar.host.url=http://10.0.20.101:9000 \
+          -Dsonar.token=sqp_cbf309e515f98d0f66e68aa0877401cb28c1571f"
+        }
     }
-    agent any 
-    stages { 
-        stage('Lint Dockerfile'){ 
-            steps{
-                echo "Pipeline Usando Jenkinsfile"
-                sh 'docker run --rm -i hadolint/hadolint < Dockerfile'
-            }
-        }
-        stage('Build image') {
-            steps{
-                script {
-                    dockerImage = docker.build registry + ":$BUILD_NUMBER"
-                }
-            }
-        }
-        stage('Delivery image') {
-            steps{
-                script {
-                  docker.withRegistry('https://registry-1.docker.io/v2/', 'dockerhub') {
-                   dockerImage.push("$BUILD_NUMBER")
-                  }
-                }
-            }
-        }
-    } 
+	 stage('Build'){
+		sh """
+            docker build -t ivankimura/unyleya:$BUILD_NUMBER -f Dockerfile .
+        """
+    }
+    stage('Deploy Dev'){
+        try{
+			sh "docker rm -f ivankimura_app_dev"
+		} catch (Exception  e) {
+			sh "echo $e"
+		}
+		sh """
+            echo "Deploy dev"
+			docker run -d -p 80:80 --name=ivankimura_app_dev ivankimura/unyleya:$BUILD_NUMBER
+        """
+    }
+    stage('Deploy Prod'){
+		input(message: "Aprovar?",ok: "Aprovado")
+		try{
+			sh "docker rm -f ivankimura_app_prod"
+		} catch (Exception  e) {
+			sh "echo $e"
+		}
+        sh """
+            echo "Deploy prod"
+			docker run -d -p 81:81 --name=ivankimura_app_prod ivankimura/unyleya:$BUILD_NUMBER
+        """
+    }
+
 }
